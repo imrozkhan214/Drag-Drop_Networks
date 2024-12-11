@@ -1,58 +1,56 @@
 import socket
-import os
 import ssl
+import os
 
-# Set up the server to accept connections securely
-def start_server(host, port):
-    # Create SSL context for server-side authentication
-    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    context.load_cert_chain(certfile="server_cert.pem", keyfile="server_key.pem")  # Add your server certificate and key
-    
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((host, port))
-    server_socket.listen(5)
-    print(f"Server listening on {host}:{port}")
-    
-    secure_server_socket = context.wrap_socket(server_socket, server_side=True)
-    return secure_server_socket
-
-# Handle a client connection and save the file sent by the client
-def handle_client(client_socket):
+# Handle incoming file from the client
+def handle_client_connection(client_socket):
     try:
+        # Receive the file size first
         data = client_socket.recv(1024).decode()
-        
-        # If it's a file transfer request
         if data.startswith("FILE:"):
             file_size = int(data.split(":")[1])
-            with open("received_file", "wb") as file:
-                while file_size > 0:
-                    chunk = client_socket.recv(min(file_size, 1024))
-                    file.write(chunk)
-                    file_size -= len(chunk)
-            print("File received successfully.")
+
+            # Prepare to receive the file
+            with open("received_file", "wb") as f:
+                received = 0
+                while received < file_size:
+                    chunk = client_socket.recv(1024)
+                    f.write(chunk)
+                    received += len(chunk)
+                print(f"File received. Total size: {file_size} bytes")
         else:
             print("Invalid data received.")
-
+        client_socket.close()
     except Exception as e:
-        print(f"Error receiving file: {e}")
-
-    finally:
-        # Close the connection after processing the file
+        print(f"Error in handle_client_connection: {e}")
         client_socket.close()
 
-# Main function to listen for incoming connections and handle file transfers
-def main():
-    host = "localhost"  # The server's IP address
-    port = 12345  # The server's port
+def start_server(host, port):
+    try:
+        # Create a socket and bind it to the server's address
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((host, port))
 
-    # Start the server
-    server_socket = start_server(host, port)
+        # Start listening for incoming connections
+        server_socket.listen(5)
+        print(f"Server listening on {host}:{port}")
 
-    # Accept client connections and handle them
-    while True:
-        client_socket, addr = server_socket.accept()
-        print(f"Connection established with {addr}")
-        handle_client(client_socket)
+        # Wrap the server socket with SSL
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.load_cert_chain(certfile="server_cert.pem", keyfile="server_key.pem")  # Add your cert and key here
+        server_socket = context.wrap_socket(server_socket, server_side=True)
+
+        while True:
+            # Accept an incoming connection
+            client_socket, addr = server_socket.accept()
+            print(f"Connection from {addr}")
+
+            # Handle the client connection
+            handle_client_connection(client_socket)
+
+    except Exception as e:
+        print(f"Server error: {e}")
 
 if __name__ == "__main__":
-    main()
+    # Start the server
+    start_server('localhost', 5000)

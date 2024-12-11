@@ -1,50 +1,73 @@
+from flask import Flask, request, jsonify
 import socket
-import os
 import ssl
+import os
 
-# Establishing a secure connection to the server
-def connect_to_server(host, port):
-    # Create SSL context for server authentication
-    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    connection = socket.create_connection((host, port))
-    secure_connection = context.wrap_socket(connection, server_hostname=host)
-    return secure_connection
+app = Flask(__name__)
 
-# Send file to the server
-def send_file(file_path, server_socket):
+# Function to send a file to the server using custom protocol
+def send_file_to_server(file_path):
     try:
-        # Get the file size
-        file_size = os.path.getsize(file_path)
-        
-        # Send file size information to the server
-        server_socket.send(f"FILE:{file_size}".encode())
+        host = 'localhost'  # Change this to your server's IP if needed
+        port = 5000  # Port on which the server is running
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
 
-        # Open the file and send in chunks
-        with open(file_path, "rb") as file:
-            while chunk := file.read(1024):
-                server_socket.send(chunk)
-        
+        # Create a socket and wrap it with SSL
+        s = socket.create_connection((host, port))
+        secure_socket = context.wrap_socket(s, server_hostname=host)
+
+        # Send file size first
+        file_size = os.path.getsize(file_path)
+        secure_socket.send(f"FILE:{file_size}".encode())
+
+        # Send the file in chunks
+        with open(file_path, "rb") as f:
+            while chunk := f.read(1024):
+                secure_socket.send(chunk)
+
         print("File sent successfully.")
+        secure_socket.close()
 
     except Exception as e:
         print(f"Error sending file: {e}")
 
-# Main function to interact with the server
-def main():
-    host = "localhost"  # The server's IP address or hostname
-    port = 12345  # The server's port
+# Route for the file upload form
+@app.route('/')
+def index():
+    return '''
+    <html>
+    <body>
+        <h1>File Transfer</h1>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="file">
+            <button type="submit">Upload File</button>
+        </form>
+    </body>
+    </html>
+    '''
 
-    # Connect to the server
-    client_socket = connect_to_server(host, port)
+# Route to handle file upload and trigger file transfer
+@app.route('/', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
 
-    # Specify the file to send
-    file_path = "path_to_your_file.pdf"  # Update this path with the file you want to send
+    # Save the file temporarily
+    file_path = os.path.join("uploads", file.filename)
+    file.save(file_path)
 
-    # Send the file
-    send_file(file_path, client_socket)
+    # Call the function to send the file to the server
+    send_file_to_server(file_path)
 
-    # Close the connection
-    client_socket.close()
+    return jsonify({"message": "File uploaded and sent to server successfully!"})
 
 if __name__ == "__main__":
-    main()
+    # Ensure the uploads directory exists
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)
