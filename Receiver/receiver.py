@@ -1,7 +1,7 @@
 import socket
 
 def receive_file():
-    host = '192.168.18.80'  # Localhost (or you can use an IP address of the receiver machine)
+    host = '192.168.56.1'  # Localhost (or you can use an IP address of the receiver machine)
     port = 10760         # Port number for the connection
 
     # Create the server socket

@@ -121,7 +121,7 @@ def start_scraping(username, password, selected_courses):
         "download.directory_upgrade": True,  # Allow upgrading the download directory
         "plugins.always_open_pdf_externally": True  # Force PDFs to open externally (not in Chrome)
     })
-    service = Service(r"C:\Users\lenovo\Documents\ChromeDriver\chromedriver-win64\chromedriver.exe")  # Ensure the path to chromedriver is correct
+    service = Service(r"E:\\USTP FILES\\3rd year - 1st sem\\Newts and Comms\\EasyFileTransfer\\chromedriver-win64\\chromedriver.exe")  # Ensure the path to chromedriver is correct
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:
